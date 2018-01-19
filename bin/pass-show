@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+set -eu
+
+script_dir="$( cd "$( dirname "$0" )" && pwd )"
+
+source "$script_dir/commons"
+
+DEFAULT_PASS_HOME="$HOME/.password-store"
+
+function show_help() {
+cat <<EOF
+Usage: `basename $0` [options]
+Show a 'pass' password or a field within it
+Options:
+  -h, --help                   Show this help
+  -n, --password-name          [REQUIRED] The name of the password to show. e.g., foo/bar/baz
+  -f, --field                  The yq expression of the field to show. e.g., '.foo.bar' OR just 'foo' for a top-level field.
+  -j, --json                   Display output in JSON (instead of YAML)
+  -v, --verbose                Enable verbose output
+
+  NOTE: If the value of the --field parameter doesn't start with a '.' one will be added
+  NOTE: 'yq' expressions are the same as 'jq' expressions See: https://stedolan.github.io/jq/manual/
+    'yq' just converts YAML to JSON then runs 'jq' on it.
+
+  Environment Variables:
+  PASS_UTILS_PASS_HOME         If specified, should be the directory that 'pass' uses to store its info. Default: $DEFAULT_PASS_HOME
+
+
+EOF
+    exit 0
+}
+
+verbose="false"
+password_name=""
+field_expression=""
+output_json="false"
+PASS_HOME="${PASS_UTILS_PASS_HOME:=$DEFAULT_PASS_HOME}"
+
+while test "$#" -ne 0
+do
+    case "$1" in
+        -h|--h|--help)
+            show_help;;
+        -f|--field)
+            shift; field_expression="$1";;
+        -j|--json)
+            output_json="true";;
+        -n|--password-name)
+            shift; password_name="$1";;
+        -v|--verbose)
+            verbose="true";;
+        *)
+            echo "Unknown argument: $1" 1>&2
+            exit 1
+            ;;
+    esac
+    shift
+done
+
+if [ "$verbose" == "true" ]; then
+  echo Using PASS_HOME: $PASS_HOME
+fi
+
+validate_non_empty_required_arg "$password_name" "--password-name"
+
+if [[ "$field_expression" != "" ]] && [[ $field_expression != .* ]] ; then
+  field_expression=".${field_expression}"
+fi
+
+pass_info="`pass show $password_name`"
+
+if [ "$field_expression" != "" ]; then
+  output_flag="-y"
+  if [ "$output_json" == "true" ]; then
+    output_flag=""
+  fi
+  echo "$pass_info" | yq $output_flag "$field_expression" | grep -v "^...$"
+else
+  echo "$pass_info"
+fi
+
