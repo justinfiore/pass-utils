@@ -1,5 +1,5 @@
 # pass-utils
-utilities for working with [pass](https://www.passwordstore.org) and multi-field password storage
+utilities for working with [`pass`](https://www.passwordstore.org) and multi-field password storage
 
 With the Unix `pass` password manager you can store arbitrary text including multiple lines.
 
@@ -42,6 +42,8 @@ pass-show -n google
 
 ## Installation
 
+0) Install [`pass`](https://www.passwordstore.org) and initialize your password store
+  - Play around with `pass` and read its docs to familiarize yourself if necessary
 1) Clone this repo
 2) Add the `bin` subdirectory to your `PATH`
 3) Install the [prerequisites](#prerequisites)
