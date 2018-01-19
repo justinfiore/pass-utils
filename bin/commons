@@ -9,3 +9,14 @@ function validate_non_empty_required_arg() {
     exit 1
   fi
 }
+
+function check_prerequisite() {
+  prereq="$1"
+  text_if_not_installed="$2"
+
+  hash $prereq 2>/dev/null || { echo >&2 "$text_if_not_installed  Aborting."; exit 1; }
+
+}
+
+check_prerequisite "jq" "ERROR: 'jq' must be installed: https://stedolan.github.io/jq/download/"
+check_prerequisite "yq" "ERROR: 'yq' must be installed: https://github.com/kislyuk/yq#installation"
