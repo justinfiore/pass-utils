@@ -13,7 +13,7 @@ Usage: `basename $0` [options] [--] [any extra args to pass to psql]
 Execute 'psql' against a database from a password entry constructed by 'pass-write-pachelbel-deployment'
 Options:
   -h, --help                   Show this help
-  -n, --password-name          [REQUIRED] The name of the password to create/overwrite. e.g., foo/bar/baz
+  -n, --password-name          [REQUIRED] The name of the password to use. e.g., foo/bar/baz
   -b, --database-name          If specified, will be appended to the 'database' field in the output yaml. No default.
   -v, --verbose                Enable verbose output
   -q, --quiet                  Silence output from this script and only output results from 'psql'
