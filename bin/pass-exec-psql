@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+set -eu
+
+script_dir="$( cd "$( dirname "$0" )" && pwd )"
+
+source "$script_dir/commons"
+
+DEFAULT_PASS_HOME="$HOME/.password-store"
+
+function show_help() {
+cat <<EOF
+Usage: `basename $0` [options] [--] [any extra args to pass to psql]
+Execute 'psql' against a database from a password entry constructed by 'pass-write-pachelbel-deployment'
+Options:
+  -h, --help                   Show this help
+  -n, --password-name          [REQUIRED] The name of the password to create/overwrite. e.g., foo/bar/baz
+  -b, --database-name          If specified, will be appended to the 'database' field in the output yaml. No default.
+  -v, --verbose                Enable verbose output
+  -q, --quiet                  Silence output from this script and only output results from 'psql'
+  --dry-run                    Don't execute the command, just log it out
+
+  Any extra arguments (or options) AFTER the recognized options will be passed to 'psql'
+
+  Environment Variables:
+  PASS_UTILS_PASS_HOME         If specified, should be the directory that 'pass' uses to store its info. Default: $DEFAULT_PASS_HOME
+
+  Examples:
+
+  To connect to the target database using the database name from the pass entry:
+    pass-exec-psql -n my-postgres
+
+  To run a specific query against the target database and dump the results to a file:
+    pass-exec-psql -n my-postgres -b my_database_name -- -c "select count(*) from users;" -o /tmp/out.txt
+
+
+EOF
+    exit 0
+}
+
+verbose="false"
+quiet="false"
+dry_run="false"
+password_name=""
+database_name=""
+PASS_HOME="${PASS_UTILS_PASS_HOME:=$DEFAULT_PASS_HOME}"
+
+while test "$#" -ne 0
+do
+    case "$1" in
+        -h|--h|--help)
+            show_help;;
+        -n|--password-name)
+            shift; password_name="$1";;
+        -b|--database-name)
+            shift; database_name="$1";;
+        -v|--verbose)
+            verbose="true";;
+        -q|--quiet)
+            quiet="true";;
+        --dry-run)
+            dry_run="true";;
+        --)
+          shift;
+          break;
+          ;;
+        *)
+            echo "Unknown argument: $1" 1>&2
+            exit 1
+            ;;
+    esac
+    shift
+done
+
+if [ "$verbose" == "true" ]; then
+  echo Using PASS_HOME: $PASS_HOME
+fi
+
+validate_non_empty_required_arg "$password_name" "--password-name"
+
+  
+passInfo="`pass show \"$password_name\"`"
+username=`echo "$passInfo" | yq -r .connections[0].username`
+password=`echo "$passInfo" | yq -r .connections[0].password`
+hostname=`echo "$passInfo" | yq -r .connections[0].host`
+port=`echo "$passInfo" | yq -r .connections[0].port`
+if [ "$database_name" == "" ]; then
+  database_name=`echo "$passInfo" | yq -r .database`
+fi
+
+if [ "$database_name" == "null" ] || [ "$database_name" == "" ]; then
+  echo "ERROR: Must specify --database-name because there is none in the password file"
+  echo
+  show_help
+  exit 1
+fi
+
+psqlCommand="psql -U $username -h $hostname -p $port $database_name"
+
+if [ "$dry_run" == "true" ]; then
+  echo "DRY RUN: Would have executed:"
+  echo "$psqlCommand $@"
+else
+  if [ "$quiet" == "false" ]; then
+    echo "Using psql command: $psqlCommand $@"
+  fi
+ PGPASSWORD="$password" $psqlCommand "$@"
+fi
+
+
+  
