@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+set -eu
+
+script_dir="$( cd "$( dirname "$0" )" && pwd )"
+
+source "$script_dir/commons"
+
+DEFAULT_PASS_HOME="$HOME/.password-store"
+
+function show_help() {
+cat <<EOF
+Usage: `basename $0` [options]
+Update a password from the output of a Pachelbel Compose Deployment Lookup (https://github.com/benjdewan/pachelbel)
+Options:
+  -h, --help                   Show this help
+  -f, --pachelbel-yaml-file    [REQUIRED] A file containing the YAML output of a Pachelbel lookup
+  -n, --password-name          [REQUIRED] The name of the password to create/overwrite. e.g., foo/bar/baz
+  -d, --deployment-name        [REQUIRED] The name of the Compose deployment to extract from the Pachelbel output
+  -b, --database-name          If specified, will be appended to the 'database' field in the output yaml. No default.
+  -v, --verbose                Enable verbose output
+
+  Environment Variables:
+  PASS_UTILS_PASS_HOME         If specified, should be the directory that 'pass' uses to store its info. Default: $DEFAULT_PASS_HOME
+
+
+EOF
+    exit 0
+}
+
+verbose="false"
+pachelbel_yaml_file=""
+password_name=""
+deployment_name=""
+database_name=""
+PASS_HOME="${PASS_UTILS_PASS_HOME:=$DEFAULT_PASS_HOME}"
+
+while test "$#" -ne 0
+do
+    case "$1" in
+        -h|--h|--help)
+            show_help;;
+        -f|--pachelbel-yaml-file)
+            shift; pachelbel_yaml_file="$1";;
+        -n|--password-name)
+            shift; password_name="$1";;
+        -d|--deployment-name)
+            shift; deployment_name="$1";;
+        -b|--database-name)
+            shift; database_name="$1";;
+        -v|--verbose)
+            verbose="true";;
+        *)
+            echo "Unknown argument: $1" 1>&2
+            exit 1
+            ;;
+    esac
+    shift
+done
+
+if [ "$verbose" == "true" ]; then
+  echo Using PASS_HOME: $PASS_HOME
+fi
+
+validate_non_empty_required_arg "$pachelbel_yaml_file" "--pachelbel-yaml-file"
+validate_non_empty_required_arg "$password_name" "--password-name"
+validate_non_empty_required_arg "$deployment_name" "--deployment-name"
+
+
+output_filename="$PASS_HOME/${password_name}.gpg"
+public_key_email="`cat $PASS_HOME/.gpg-id`"
+
+if [ "$verbose" == "true" ]; then
+  echo "Writing output file: $output_filename"
+fi
+
+yaml=`cat "$pachelbel_yaml_file" | yq -y ".\"$deployment_name\"" | grep -v cacert`
+if [ "$database_name" != "" ]; then
+  yaml=`echo -e "$yaml\ndatabase: $database_name"`
+fi
+
+output_dir=`dirname "$output_filename"`
+mkdir -p "$output_dir"
+rm -f "$output_filename"
+echo "$yaml" | gpg2 -r "$public_key_email" -o $output_filename --encrypt
+
+echo "Wrote file: $output_filename"
+echo "Showing pass: $password_name"
+echo ------------------------------
+pass show $password_name
+echo ------------------------------
+
+echo "Done"
+

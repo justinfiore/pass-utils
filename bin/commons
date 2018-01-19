@@ -1,0 +1,11 @@
+function validate_non_empty_required_arg() {
+  arg="$1"
+  arg_name="$2"
+
+  if [ "$arg" == "" ]; then
+    echo "ERROR: Argument $arg_name is required."
+    echo
+    show_help
+    exit 1
+  fi
+}
